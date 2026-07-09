@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PETA ORBIT — OSPEK SB 63</title>
+<style>
+  :root{
+    --void:#04060e;
+    --gold:#e9c87a;
+    --gold-soft:#caa85a;
+    --star:#f4f6ff;
+    --mist:#9db0d8;
+    --serif:"Iowan Old Style", Palatino, "Book Antiqua", Georgia, serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--void);}
+  body{
+    font-family:var(--serif);
+    color:var(--star);
+    -webkit-user-select:none;user-select:none;
+    cursor:default;
+    position:fixed;inset:0;
+  }
+  #stage{position:absolute;inset:0;}
+  canvas#sky{position:absolute;inset:0;display:block;width:100%;height:100%;}
+
+  /* Blackout overlay */
+  #blackout{
+    position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 50%,
+      rgba(2,3,9,0.35) 0%,
+      rgba(2,3,9,0.55) 45%,
+      rgba(2,3,9,0.97) 100%);
+    opacity:1;
+    transition:none;
+    z-index:5;
+  }
+
+  /* ---- Title cards ---- */
+  #cards{position:absolute;inset:0;z-index:20;pointer-events:none;}
+
+  .card{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    opacity:0;transition:opacity 1s ease;
+    text-align:center;padding:0 8vw;
+  }
+  .card.show{opacity:1;}
+
+  .eyebrow{
+    font-size:13px;letter-spacing:.55em;text-transform:uppercase;
+    color:var(--gold);margin-bottom:22px;
+    text-shadow:0 0 20px rgba(233,200,122,.5);
+  }
+  .bigtitle{
+    font-size:clamp(38px,8vw,104px);line-height:1.02;font-weight:600;
+    letter-spacing:.04em;
+    color:#fff;
+    text-shadow:0 0 40px rgba(157,176,216,.4),0 2px 30px rgba(0,0,0,.8);
+  }
+  .bigtitle em{font-style:italic;color:var(--gold);}
+  .subtitle{
+    margin-top:26px;font-size:clamp(14px,2vw,19px);
+    letter-spacing:.16em;color:var(--mist);max-width:640px;line-height:1.7;
+  }
+  @keyframes pulse{0%,100%{opacity:.4;}50%{opacity:1;}}
+
+  /* ---- Day card (left-aligned cinematic) ---- */
+  #daycard{
+    position:absolute;inset:0;z-index:22;pointer-events:none;
+    display:flex;align-items:center;overflow:hidden;
+    opacity:0;transition:opacity .9s ease;
+  }
+  #daycard.show{opacity:1;}
+  .day-inner{
+    margin-left:9vw;display:flex;align-items:stretch;gap:34px;
+    transform:translateY(18px);transition:transform 1s cubic-bezier(.22,.61,.36,1);
+  }
+  #daycard.show .day-inner{transform:translateY(0);}
+  .rail{
+    width:2px;background:linear-gradient(180deg,transparent,var(--gold),transparent);
+    box-shadow:0 0 14px rgba(233,200,122,.6);
+    transform-origin:center;animation:railgrow 1.1s cubic-bezier(.22,.61,.36,1);
+  }
+  @keyframes railgrow{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+  .day-text{display:flex;flex-direction:column;justify-content:center;}
+  .day-roman{
+    font-size:var(--romanSize, clamp(70px,15vw,190px));line-height:.86;font-weight:600;
+    color:#fff;letter-spacing:.01em;
+    text-shadow:0 0 48px rgba(233,200,122,.35),0 4px 36px rgba(0,0,0,.85);
+  }
+  .day-num{
+    font-size:13px;letter-spacing:.5em;text-transform:uppercase;
+    color:var(--gold);margin-bottom:14px;
+    text-shadow:0 0 18px rgba(233,200,122,.5);
+  }
+  .day-title{
+    font-size:clamp(24px,3.4vw,42px);margin-top:18px;color:#fff;font-weight:600;
+    letter-spacing:.02em;text-shadow:0 2px 24px rgba(0,0,0,.8);
+  }
+  .day-sub{
+    margin-top:14px;font-size:clamp(14px,1.7vw,18px);color:var(--mist);
+    max-width:520px;line-height:1.7;letter-spacing:.05em;
+  }
+
+  /* Loader */
+  #loader{
+    position:absolute;inset:0;z-index:90;background:var(--void);
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    transition:opacity .6s ease;
+  }
+  #loader.hide{opacity:0;pointer-events:none;}
+  #loader .lg{
+    font-size:13px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);
+    animation:pulse 1.4s ease-in-out infinite;
+  }
+  #loader .lr{
+    margin-top:20px;width:46px;height:46px;border-radius:50%;
+    border:2px solid rgba(233,200,122,.2);border-top-color:var(--gold);
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="sky"></canvas>
+  <div id="blackout"></div>
+
+  <!-- Title cards -->
+  <div id="cards">
+    <!-- slide 0 opening -->
+    <div class="card" data-card="0">
+      <div class="eyebrow">Observatorium · Peta Bintang</div>
+      <div class="bigtitle">PETA <em>ORBIT</em><br>OSPEK SB 63</div>
+      <div class="subtitle">Sepuluh rasi, sepuluh hari perjalanan. Kubah masih tertutup — langit menanti untuk dibuka.</div>
+    </div>
+    <!-- slide 1 after opening -->
+    <div class="card" data-card="1">
+      <div class="eyebrow">Upacara Pembukaan</div>
+      <div class="bigtitle">LANGIT <em>TERBUKA</em></div>
+      <div class="subtitle">Kubah telah terbuka. Selamat datang di Peta Orbit OSPEK SB 63 — mari menelusuri sepuluh rasi.</div>
+    </div>
+    <!-- slide 12 closing -->
+    <div class="card" data-card="12">
+      <div class="eyebrow">Upacara Penutupan</div>
+      <div class="bigtitle">SAMPAI <em>JUMPA</em><br>DI ORBIT BERIKUTNYA</div>
+      <div class="subtitle">Sepuluh rasi telah dilintasi. Kubah menutup perlahan — terima kasih, OSPEK SB 63.</div>
+    </div>
+  </div>
+
+  <!-- Day card -->
+  <div id="daycard">
+    <div class="day-inner">
+      <div class="rail"></div>
+      <div class="day-text">
+        <div class="day-num" id="dNum">DAY 01</div>
+        <div class="day-roman" id="dRoman">I</div>
+        <div class="day-title" id="dTitle">Judul Hari ke-1</div>
+        <div class="day-sub" id="dSub">Deskripsi singkat kegiatan hari ke-1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="lg">Menyiapkan Observatorium</div>
+    <div class="lr"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   DATA
+============================================================ */
+const DAYS = ["I","II","III","IV","V","VI","VII","VIII","IX","X"].map((r,i)=>({
+  roman:r,
+  num:String(i+1).padStart(2,"0"),
+  title:"Judul Hari ke-"+(i+1),
+  sub:"Deskripsi singkat kegiatan hari ke-"+(i+1)
+}));
+
+// Slide labels for HUD
+const SLIDE_LABELS = [
+  "PEMBUKAAN","LANGIT TERBUKA",
+  ...DAYS.map(d=>"HARI "+d.roman),
+  "PENUTUPAN"
+];
+const TOTAL = 13; // slides 0..12
+
+/* ============================================================
+   SEEDED RNG
+============================================================ */
+function mulberry32(a){
+  return function(){
+    a|=0;a=a+0x6D2B79F5|0;
+    let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return ((t^t>>>14)>>>0)/4294967296;
+  };
+}
+
+/* ============================================================
+   CANVAS SETUP
+============================================================ */
+const canvas = document.getElementById("sky");
+const ctx = canvas.getContext("2d");
+let W=0,H=0,DPR=1;
+var domReady=false;   // hoisted; set true after DOM refs & layout fns exist
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.floor(W*DPR);
+  canvas.height = Math.floor(H*DPR);
+  canvas.style.width = W+"px";
+  canvas.style.height = H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  if(domReady) layoutDayCard();   // domReady is a hoisted var; avoids TDZ on first call
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* ============================================================
+   SKY MODEL — constellations on a ring + stars + nebula
+============================================================ */
+const SKY_R = 940;              // ring radius (sky units)
+const CONST_COUNT = 10;
+const constellations = [];
+
+function buildSky(){
+  for(let n=0;n<CONST_COUNT;n++){
+    const ang = n * (Math.PI*2/CONST_COUNT) - Math.PI/2; // start top
+    const cx = Math.cos(ang)*SKY_R;
+    const cy = Math.sin(ang)*SKY_R;
+    const rng = mulberry32(1000 + n*97);
+    const nodeCount = 5 + Math.floor(rng()*3); // 5..7
+    const nodes = [];
+    for(let i=0;i<nodeCount;i++){
+      const a = rng()*Math.PI*2;
+      const rr = 40 + rng()*150;
+      nodes.push({
+        x: cx + Math.cos(a)*rr*(0.6+rng()*0.8),
+        y: cy + Math.sin(a)*rr*(0.6+rng()*0.8),
+        mag: 1.4 + rng()*2.6,        // star size
+        tw: rng()*Math.PI*2,         // twinkle phase
+        tws: 0.6 + rng()*1.4         // twinkle speed
+      });
+    }
+    // main path: order nodes roughly by angle around centroid for a chain
+    let mcx=0,mcy=0; nodes.forEach(p=>{mcx+=p.x;mcy+=p.y;});
+    mcx/=nodes.length; mcy/=nodes.length;
+    const order = nodes.map((p,idx)=>idx).sort((A,B)=>
+      Math.atan2(nodes[A].y-mcy,nodes[A].x-mcx) -
+      Math.atan2(nodes[B].y-mcy,nodes[B].x-mcx));
+    const lines = [];
+    for(let i=0;i<order.length-1;i++) lines.push([order[i],order[i+1]]);
+    // one branch line
+    if(nodes.length>3){
+      const a = Math.floor(rng()*nodes.length);
+      let b = Math.floor(rng()*nodes.length);
+      if(b===a) b=(b+1)%nodes.length;
+      lines.push([a,b]);
+    }
+    constellations.push({n, cx, cy, nodes, lines, name:"Rasi "+DAYS[n].roman});
+  }
+}
+buildSky();
+
+// Background field stars (distributed across a wide field)
+const fieldStars = [];
+(function(){
+  const rng = mulberry32(77);
+  for(let i=0;i<520;i++){
+    const a = rng()*Math.PI*2;
+    const rr = rng()*1500;
+    fieldStars.push({
+      x: Math.cos(a)*rr,
+      y: Math.sin(a)*rr,
+      r: 0.4 + rng()*1.5,
+      base: 0.25 + rng()*0.6,
+      tw: rng()*Math.PI*2,
+      tws: 0.4 + rng()*1.6,
+      hue: rng()<0.85 ? 0 : 1   // 0 white, 1 gold tint
+    });
+  }
+})();
+
+// Nebula blobs (Milky Way diagonal band, additive)
+const nebula = [];
+(function(){
+  const rng = mulberry32(2024);
+  // diagonal band from top-left to bottom-right
+  for(let i=0;i<26;i++){
+    const t = (i/25)*2-1;            // -1..1 along band
+    const along = t*1500;
+    const perp = (rng()*2-1)*260;
+    // rotate band 35deg
+    const ca=Math.cos(-0.62), sa=Math.sin(-0.62);
+    const bx = along*ca - perp*sa;
+    const by = along*sa + perp*ca;
+    const cols = [
+      [80,150,220],   // blue
+      [70,200,200],   // teal
+      [150,110,210]   // purple
+    ];
+    const c = cols[Math.floor(rng()*cols.length)];
+    nebula.push({
+      x:bx, y:by,
+      r: 220 + rng()*340,
+      col:c,
+      alpha: 0.05 + rng()*0.09,
+      phase: rng()*Math.PI*2,
+      speed: 0.15 + rng()*0.4,
+      amp: 18 + rng()*46,
+      perpx: -sa, perpy: ca   // displacement direction (perp to band)
+    });
+  }
+})();
+
+/* ============================================================
+   CAMERA / STATE
+============================================================ */
+// cur = current rendered state, T = target
+const cur = { cx:0, cy:0, zoom:1.45, shutter:0, blackout:1, domeA:1, scopeA:0 };
+const T   = { cx:0, cy:0, zoom:1.45, shutter:0, blackout:1, domeA:1, scopeA:0 };
+// shutter: 0 = closed, 1 = fully open
+// blackout: 1 = dark, 0 = bright
+// domeA: dome overlay alpha ; scopeA: eyepiece alpha
+
+let slide = 0;
+
+// Slow cinematic sequence (open / close)
+let seq = null; // {t,dur,fromS,toS,fromB,toB,onEnd}
+
+function easeInOutCubic(x){
+  return x<0.5 ? 4*x*x*x : 1 - Math.pow(-2*x+2,3)/2;
+}
+
+/* ============================================================
+   APPLY SLIDE — sets targets / sequences / cards
+============================================================ */
+const elCards = document.querySelectorAll(".card");
+const elDayCard = document.getElementById("daycard");
+const elDayInner = elDayCard.querySelector(".day-inner");
+
+/* Position the day text so it NEVER overlaps the telescope eyepiece.
+   Wide screens: text lives in the dark band to the LEFT of the circle.
+   Narrow/portrait: text drops to the band BELOW the circle. */
+function layoutDayCard(){
+  const R = scopeR();
+  const gap = 46;
+  const leftBand = W/2 - R;            // dark area left of the eyepiece circle
+  const elSub = document.getElementById("dSub");
+  if(leftBand >= 320){
+    // WIDE (16:9 projector): text in the dark band LEFT of the circle
+    const region = W/2 - R - gap;      // right boundary of the safe text zone
+    const padL = Math.max(36, W*0.05);
+    elDayCard.style.left = "0px";
+    elDayCard.style.right = "auto";
+    elDayCard.style.top = "0px";
+    elDayCard.style.bottom = "auto";
+    elDayCard.style.width = region + "px";
+    elDayCard.style.height = H + "px";
+    elDayCard.style.alignItems = "center";
+    elDayCard.style.justifyContent = "flex-start";
+    elDayInner.style.marginLeft = padL + "px";
+    elDayInner.style.flexDirection = "row";
+    const textW = region - padL - 36;
+    elDayInner.style.maxWidth = Math.max(200, textW) + "px";
+    elDayCard.style.setProperty("--romanSize", Math.max(40, Math.min(168, textW/2.4)) + "px");
+    elSub.style.display = "";
+  } else {
+    // NARROW / SQUARE: text in the band BELOW the circle, compact & clipped-safe
+    const top = H/2 + R + Math.max(12, (H/2 - R)*0.18);
+    const bandH = Math.max(70, H - top);
+    elDayCard.style.left = "0px";
+    elDayCard.style.right = "auto";
+    elDayCard.style.top = top + "px";
+    elDayCard.style.bottom = "auto";
+    elDayCard.style.width = W + "px";
+    elDayCard.style.height = bandH + "px";
+    elDayCard.style.alignItems = "center";
+    elDayCard.style.justifyContent = "center";
+    elDayInner.style.marginLeft = "0px";
+    elDayInner.style.flexDirection = "row";
+    elDayInner.style.maxWidth = Math.min(W*0.9, 760) + "px";
+    elDayCard.style.setProperty("--romanSize", Math.max(30, Math.min(96, bandH*0.46)) + "px");
+    elSub.style.display = bandH < 150 ? "none" : "";   // drop subtitle when too tight
+  }
+}
+
+function showCard(idx){
+  elCards.forEach(c=>{
+    c.classList.toggle("show", c.dataset.card === String(idx));
+  });
+}
+function hideAllCards(){ elCards.forEach(c=>c.classList.remove("show")); }
+
+function setDayCard(dayIdx, on){
+  if(on){
+    const d = DAYS[dayIdx];
+    document.getElementById("dNum").textContent = "DAY "+d.num;
+    document.getElementById("dRoman").textContent = d.roman;
+    document.getElementById("dTitle").textContent = d.title;
+    document.getElementById("dSub").textContent = d.sub;
+    layoutDayCard();
+    // retrigger rail animation
+    elDayCard.classList.remove("show");
+    void elDayCard.offsetWidth;
+    elDayCard.classList.add("show");
+  } else {
+    elDayCard.classList.remove("show");
+  }
+}
+
+function focusConstellation(i){
+  const c = constellations[i];
+  // zoom OUT relative to the open-dome view, so it reads as pulling back
+  // to sit behind the telescope eyepiece, then the iris frames the sky
+  T.cx = c.cx; T.cy = c.cy; T.zoom = 1.30;
+  T.domeA = 0; T.scopeA = 1;
+}
+function unfocus(){
+  // pressed up against the open aperture (slightly zoomed in)
+  T.cx = 0; T.cy = 0; T.zoom = 1.45;
+  T.domeA = 1; T.scopeA = 0;
+}
+
+function applySlide(prev){
+  seq = null;
+  hideAllCards();
+  setDayCard(0,false);
+
+  if(slide===0){
+    // closed dome, dark
+    T.shutter=0; T.blackout=1; unfocus();
+    T.domeA=1; T.scopeA=0;
+    showCard(0);
+  }
+  else if(slide===1){
+    // OPENING SEQUENCE: 10s shutter open + dark->bright
+    unfocus(); T.domeA=1; T.scopeA=0;
+    // if coming forward from slide 0, run the sequence; if back, just set open
+    if(prev!==undefined && prev<1){
+      cur.shutter = 0; cur.blackout = 1;
+      seq = {
+        t:0, dur:10.0,
+        fromS:0, toS:1,
+        fromB:1, toB:0,
+        kind:"open",
+        onEnd:()=>{ showCard(1); }
+      };
+    } else {
+      T.shutter=1; T.blackout=0;
+      cur.shutter=1; cur.blackout=0;
+      showCard(1);
+    }
+  }
+  else if(slide>=2 && slide<=11){
+    // DAY slides
+    const dayIdx = slide-2;
+    T.shutter=1; T.blackout=0;
+    cur.shutter=1; // keep open
+    focusConstellation(dayIdx);
+    setDayCard(dayIdx,true);
+  }
+  else if(slide===12){
+    // CLOSING SEQUENCE: ~8s shutter close + bright->dark
+    unfocus(); T.domeA=1; T.scopeA=0;
+    cur.scopeA=0; cur.domeA=1;
+    if(prev!==undefined && prev<12){
+      cur.shutter=1; cur.blackout=0;
+      seq = {
+        t:0, dur:8.0,
+        fromS:1, toS:0,
+        fromB:0, toB:1,
+        kind:"close",
+        onEnd:()=>{ showCard(12); }
+      };
+    } else {
+      T.shutter=0; T.blackout=1;
+      cur.shutter=0; cur.blackout=1;
+      showCard(12);
+    }
+  }
+}
+
+/* ============================================================
+   NAVIGATION
+============================================================ */
+function go(to){
+  const prev = slide;
+  slide = Math.max(0, Math.min(TOTAL-1, to));
+  if(slide===prev && to===prev){ /* same */ }
+  applySlide(prev);
+}
+function next(){
+  // If a slow sequence is running, → skips to end
+  if(seq){
+    skipSeq();
+    return;
+  }
+  if(slide<TOTAL-1) go(slide+1);
+}
+function prev(){
+  if(seq){ skipSeq(); return; }
+  if(slide>0) go(slide-1);
+}
+function skipSeq(){
+  if(!seq) return;
+  cur.shutter = seq.toS;
+  cur.blackout = seq.toB;
+  T.shutter = seq.toS;
+  T.blackout = seq.toB;
+  const end = seq.onEnd;
+  seq = null;
+  if(end) end();
+}
+
+/* silent keyboard control — manual advance, no on-screen UI */
+window.addEventListener("keydown", e=>{
+  switch(e.key){
+    case "ArrowRight": case " ": case "Enter":
+      e.preventDefault(); next(); break;
+    case "ArrowLeft":
+      e.preventDefault(); prev(); break;
+    case "Home":
+      e.preventDefault(); go(0); break;
+  }
+});
+
+/* ============================================================
+   DRAW: SKY (camera transform space)
+============================================================ */
+function drawSky(time){
+  // backdrop gradient already painted in main; here we are in identity
+  ctx.save();
+  // camera transform: translate to screen center, scale by zoom, offset by camera target
+  ctx.translate(W/2, H/2);
+  ctx.scale(cur.zoom, cur.zoom);
+  // gentle sway of whole sky (never a full spin)
+  const sway = Math.sin(time*0.06)*0.012 + Math.cos(time*0.043)*0.008;
+  ctx.rotate(sway);
+  ctx.translate(-cur.cx, -cur.cy);
+
+  // ---- NEBULA (additive) ----
+  ctx.globalCompositeOperation = "lighter";
+  for(const b of nebula){
+    const disp = Math.sin(time*b.speed + b.phase)*b.amp;
+    const bx = b.x + b.perpx*disp;
+    const by = b.y + b.perpy*disp;
+    const g = ctx.createRadialGradient(bx,by,0,bx,by,b.r);
+    const [r,gg,bl] = b.col;
+    const aa = b.alpha*(0.8+0.2*Math.sin(time*0.5+b.phase));
+    g.addColorStop(0, `rgba(${r},${gg},${bl},${aa})`);
+    g.addColorStop(1, `rgba(${r},${gg},${bl},0)`);
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.arc(bx,by,b.r,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  // ---- LAT/LONG GRID (faint) ----
+  ctx.save();
+  ctx.strokeStyle = "rgba(157,176,216,0.06)";
+  ctx.lineWidth = 1/cur.zoom;
+  for(let r=300;r<=1500;r+=300){
+    ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.stroke();
+  }
+  for(let a=0;a<12;a++){
+    const ang=a*Math.PI/6;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(ang)*1500, Math.sin(ang)*1500);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // ---- FIELD STARS (twinkle) ----
+  for(const s of fieldStars){
+    const tw = s.base * (0.55 + 0.45*Math.sin(time*s.tws + s.tw));
+    ctx.beginPath();
+    ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle = s.hue
+      ? `rgba(233,200,122,${tw})`
+      : `rgba(244,246,255,${tw})`;
+    ctx.fill();
+  }
+
+  // ---- CONSTELLATIONS ----
+  for(const c of constellations){
+    // lines (gold)
+    ctx.strokeStyle = "rgba(233,200,122,0.55)";
+    ctx.lineWidth = 1.4/cur.zoom;
+    ctx.shadowColor = "rgba(233,200,122,0.55)";
+    ctx.shadowBlur = 8;
+    for(const [a,b] of c.lines){
+      const pa=c.nodes[a], pb=c.nodes[b];
+      ctx.beginPath();
+      ctx.moveTo(pa.x,pa.y);
+      ctx.lineTo(pb.x,pb.y);
+      ctx.stroke();
+    }
+    ctx.shadowBlur=0;
+
+    // star nodes (additive glow)
+    ctx.globalCompositeOperation = "lighter";
+    for(const p of c.nodes){
+      const tw = 0.6 + 0.4*Math.sin(time*p.tws + p.tw);
+      const rad = p.mag*2.4;
+      const g = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,rad*3);
+      g.addColorStop(0,`rgba(255,247,224,${0.95*tw})`);
+      g.addColorStop(0.3,`rgba(233,200,122,${0.5*tw})`);
+      g.addColorStop(1,"rgba(233,200,122,0)");
+      ctx.fillStyle=g;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,rad*3,0,Math.PI*2);
+      ctx.fill();
+      // core
+      ctx.fillStyle=`rgba(255,255,255,${0.9*tw})`;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.mag*0.9,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    // label (small, near centroid) — only visible when reasonably zoomed/close
+    ctx.fillStyle = "rgba(233,200,122,0.35)";
+    ctx.font = `${16/cur.zoom}px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.textAlign="center";
+    ctx.fillText(c.name, c.cx, c.cy + 200);
+  }
+
+  ctx.restore();
+}
+
+/* ============================================================
+   DRAW: OBSERVATORY DOME (screen space)
+============================================================ */
+// telescope eyepiece radius — shared by drawScope() and the day-card layout
+function scopeR(){ return Math.min(W,H)*0.42; }
+
+/*
+  FULL-SCREEN DOME: two steel doors cover the ENTIRE viewport (slide 0).
+  Opening slides both doors off-screen to reveal the whole sky (slide 1).
+  Closed:  left door [0 .. W/2], right door [W/2 .. W]
+  Opening: left shifts left by `shift`, right shifts right by `shift`
+           gap revealed between (W/2 - shift) and (W/2 + shift)
+*/
+function drawDome(alpha){
+  if(alpha<=0.001) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  drawShutters();
+  drawDomeBezel();
+  ctx.restore();
+}
+
+function drawShutters(){
+  const open = cur.shutter;                 // 0 closed .. 1 fully open
+  const shift = open * (W/2 + 60);           // travel of each door
+  const apexX = W/2, apexY = -H*0.62;        // dome apex above the screen (rib fan origin)
+  const bands = 11;
+
+  function door(side){
+    const dx = side<0 ? -shift : (W/2 + shift);
+    const dw = W/2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(dx, -2, dw, H+4);
+    ctx.clip();
+
+    // steel base
+    const g = ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#2c3344");
+    g.addColorStop(0.45,"#232a3a");
+    g.addColorStop(1,"#141926");
+    ctx.fillStyle=g;
+    ctx.fillRect(dx,-2,dw,H+4);
+
+    // curved dome shading (lighter near apex)
+    const dg = ctx.createRadialGradient(apexX,apexY, H*0.2, apexX,apexY, H*1.5);
+    dg.addColorStop(0,"rgba(180,196,224,0.10)");
+    dg.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=dg;
+    ctx.fillRect(dx,-2,dw,H+4);
+
+    // radial ribs fanning from the dome apex
+    ctx.strokeStyle="rgba(150,168,196,0.10)";
+    ctx.lineWidth=2;
+    for(let i=0;i<48;i++){
+      const a = (i/48)*Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(apexX, apexY);
+      ctx.lineTo(apexX + Math.cos(a)*H*2.6, apexY + Math.sin(a)*H*2.6);
+      ctx.stroke();
+    }
+
+    // horizontal band panels
+    ctx.lineWidth=1.4;
+    for(let i=1;i<bands;i++){
+      const y=(i/bands)*H;
+      ctx.strokeStyle="rgba(90,102,124,0.22)";
+      ctx.beginPath(); ctx.moveTo(dx,y); ctx.lineTo(dx+dw,y); ctx.stroke();
+      ctx.fillStyle = i%2 ? "rgba(255,255,255,0.012)" : "rgba(0,0,0,0.06)";
+      ctx.fillRect(dx,y,dw,H/bands);
+    }
+
+    // vertical ribs
+    ctx.strokeStyle="rgba(0,0,0,0.18)";
+    ctx.lineWidth=1.4;
+    const vr=8;
+    for(let i=1;i<vr;i++){
+      const x=dx + (i/vr)*dw;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+    ctx.strokeStyle="rgba(180,195,215,0.07)";
+    for(let i=1;i<vr;i++){
+      const x=dx + (i/vr)*dw + 1.4;
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+
+    // rivets at band/rib intersections
+    ctx.fillStyle="rgba(180,195,215,0.16)";
+    for(let by=1;by<bands;by++){
+      const y=(by/bands)*H;
+      for(let bx=0;bx<=vr;bx++){
+        const x=dx + (bx/vr)*dw;
+        ctx.beginPath(); ctx.arc(x,y,1.7,0,Math.PI*2); ctx.fill();
+      }
+    }
+
+    // inner (meeting) edge: shadow + highlight to read as a thick door
+    const ix = side<0 ? dx+dw : dx;          // the edge facing center
+    ctx.fillStyle="rgba(0,0,0,0.38)";
+    ctx.fillRect(side<0 ? ix-7 : ix, 0, 7, H);
+    ctx.fillStyle="rgba(195,210,230,0.20)";
+    ctx.fillRect(side<0 ? ix-2 : ix, 0, 2, H);
+
+    ctx.restore();
+  }
+  door(-1);
+  door(1);
+
+  // GOLD SEAM glow — on the parting edges while opening, fades at the ends
+  if(open>0.002 && open<0.998){
+    const seamA = Math.sin(open*Math.PI);    // peaks mid-open
+    const lx = W/2 - shift, rx = W/2 + shift;
+    [lx,rx].forEach(x=>{
+      const gg = ctx.createLinearGradient(x-55,0,x+55,0);
+      gg.addColorStop(0,"rgba(233,200,122,0)");
+      gg.addColorStop(0.5,`rgba(255,242,205,${0.55*seamA})`);
+      gg.addColorStop(1,"rgba(233,200,122,0)");
+      ctx.fillStyle=gg;
+      ctx.fillRect(x-55,0,110,H);
+    });
+  } else if(open<=0.002){
+    // closed: faint warm seam down the center
+    const gg = ctx.createLinearGradient(W/2-34,0,W/2+34,0);
+    gg.addColorStop(0,"rgba(233,200,122,0)");
+    gg.addColorStop(0.5,"rgba(233,200,122,0.12)");
+    gg.addColorStop(1,"rgba(233,200,122,0)");
+    ctx.fillStyle=gg;
+    ctx.fillRect(W/2-34,0,68,H);
+    ctx.fillStyle="rgba(233,200,122,0.22)";
+    ctx.fillRect(W/2-1,0,2,H);
+  }
+}
+
+// enclosing dome bezel — dark, slightly curved edge vignette
+function drawDomeBezel(){
+  const vg = ctx.createRadialGradient(W/2,H*0.46, H*0.28, W/2,H*0.46, Math.max(W,H)*0.74);
+  vg.addColorStop(0,"rgba(0,0,0,0)");
+  vg.addColorStop(0.7,"rgba(0,0,0,0.12)");
+  vg.addColorStop(1,"rgba(0,0,0,0.62)");
+  ctx.fillStyle=vg;
+  ctx.fillRect(0,0,W,H);
+}
+
+/* ============================================================
+   DRAW: TELESCOPE EYEPIECE (screen space)
+============================================================ */
+function drawScope(alpha){
+  if(alpha<=0.001) return;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  const cx=W/2, cy=H/2;
+  const R = scopeR();
+
+  // dark surround (everything outside the circle)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0,0,W,H);
+  ctx.arc(cx,cy,R,0,Math.PI*2);
+  ctx.clip("evenodd");
+  ctx.fillStyle="rgba(2,3,9,0.96)";
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+
+  // soft radial vignette toward inner edge
+  const vg = ctx.createRadialGradient(cx,cy,R*0.55, cx,cy,R);
+  vg.addColorStop(0,"rgba(0,0,0,0)");
+  vg.addColorStop(1,"rgba(0,0,0,0.6)");
+  ctx.fillStyle=vg;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fill();
+
+  // gold outer ring
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
+  ctx.strokeStyle="rgba(233,200,122,0.9)";
+  ctx.lineWidth=4;
+  ctx.shadowColor="rgba(233,200,122,0.6)";
+  ctx.shadowBlur=20;
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  // inner ring
+  ctx.beginPath(); ctx.arc(cx,cy,R-12,0,Math.PI*2);
+  ctx.strokeStyle="rgba(255,247,224,0.4)";
+  ctx.lineWidth=1.5;
+  ctx.stroke();
+
+  // 72 tick marks
+  ctx.strokeStyle="rgba(233,200,122,0.55)";
+  for(let i=0;i<72;i++){
+    const a=(i/72)*Math.PI*2;
+    const long = (i%6===0);
+    const r1 = R-14;
+    const r2 = R-14-(long?14:7);
+    ctx.lineWidth = long?2:1;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+    ctx.lineTo(cx+Math.cos(a)*r2, cy+Math.sin(a)*r2);
+    ctx.stroke();
+  }
+
+  // crosshair reticle
+  ctx.strokeStyle="rgba(233,200,122,0.45)";
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(cx-R+24, cy); ctx.lineTo(cx-26,cy);
+  ctx.moveTo(cx+26, cy); ctx.lineTo(cx+R-24,cy);
+  ctx.moveTo(cx, cy-R+24); ctx.lineTo(cx,cy-26);
+  ctx.moveTo(cx, cy+26); ctx.lineTo(cx,cy+R-24);
+  ctx.stroke();
+  // center small circle
+  ctx.beginPath(); ctx.arc(cx,cy,22,0,Math.PI*2);
+  ctx.strokeStyle="rgba(233,200,122,0.6)"; ctx.lineWidth=1.2; ctx.stroke();
+  // tiny center dot ticks
+  ctx.beginPath();
+  ctx.moveTo(cx-6,cy); ctx.lineTo(cx+6,cy);
+  ctx.moveTo(cx,cy-6); ctx.lineTo(cx,cy+6);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/* ============================================================
+   MAIN LOOP
+============================================================ */
+const elBlackout = document.getElementById("blackout");
+let last = performance.now();
+let timeS = 0;
+
+function frame(now){
+  let dt = (now - last)/1000;
+  last = now;
+  if(dt>0.05) dt=0.05;   // cap at 50ms
+  timeS += dt;
+
+  // ---- sequence drives shutter/blackout ----
+  if(seq){
+    seq.t += dt;
+    let p = Math.min(1, seq.t/seq.dur);
+    const e = easeInOutCubic(p);
+    cur.shutter  = seq.fromS + (seq.toS-seq.fromS)*e;
+    cur.blackout = seq.fromB + (seq.toB-seq.fromB)*e;
+    T.shutter = cur.shutter;
+    T.blackout = cur.blackout;
+    if(p>=1){
+      const end = seq.onEnd; seq=null;
+      if(end) end();
+    }
+  } else {
+    // frame-rate independent lerp toward targets
+    const k = 1 - Math.pow(0.015, dt);
+    cur.cx += (T.cx-cur.cx)*k;
+    cur.cy += (T.cy-cur.cy)*k;
+    cur.zoom += (T.zoom-cur.zoom)*k;
+    cur.shutter += (T.shutter-cur.shutter)*k;
+    cur.blackout += (T.blackout-cur.blackout)*k;
+  }
+  // domeA / scopeA always lerp (crossfade)
+  {
+    const k = 1 - Math.pow(0.015, dt);
+    cur.domeA += (T.domeA-cur.domeA)*k;
+    cur.scopeA += (T.scopeA-cur.scopeA)*k;
+  }
+
+  // ---- DRAW ORDER ----
+  // (1) backdrop gradient
+  const bg = ctx.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,"#060a16");
+  bg.addColorStop(0.5,"#04060e");
+  bg.addColorStop(1,"#02030a");
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,W,H);
+
+  // (2) sky in camera space
+  drawSky(timeS);
+
+  // (3) dome or scope overlay (crossfade)
+  drawDome(cur.domeA);
+  drawScope(cur.scopeA);
+
+  // (4) DOM blackout opacity
+  elBlackout.style.opacity = cur.blackout.toFixed(3);
+
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+domReady = true;
+layoutDayCard();
+applySlide();
+// loader hides after 500ms (no dependency)
+setTimeout(()=>{
+  document.getElementById("loader").classList.add("hide");
+}, 500);
+
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
